@@ -1,2 +1,2 @@
 # NatSelSim
-Natural Selection simulator 
+Natural Selection simulator
