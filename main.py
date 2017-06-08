@@ -2,29 +2,46 @@
 
 #imports
 import random as r
-import operator as op
 import numpy as n
 import math as m
 import mpmath as np
 #settings
 
-start_organisms = 500 #how many organisms with start with
+start_organisms = 1000 #how many organisms with start with
+
 
 start_food = 1000 #how much food we start with. Food increases linearlly
 
-delta_food = 200 #by how much food increases each generation
+delta_food = 100 #by how much food increases each generation
 
-reprSuccess = 1.9 #reproductive success of the organisms, the population will increase when its more than 2, and decrease when its less than two
+reprSuccess = 2 #startingreproductive success of the organisms, the population will increase when its more than 2, and decrease when its less than two
 
-breedRate = 0.01 #this is the average that will setup the bell curve. If its equal to 0.01, this means that around 1% of all breeding will be outside of either the parent values (if Ivan did his math correctly)
+breedRate = 0.1 #this is the average that will setup the bell curve. If its equal to 0.01, this means that around 1% of all breeding will be outside of either the parent values (if Ivan did his math correctly)
 
 maxGenerations = 100 #total generations we will run the program for
 
 succChange = 0.5 #by how much success will change, the higher this number us, the more the population will be affected by food
 
+encounters = 5 #number of times each organism will encounter a predator per generation in this simulation
+
+bestSize = 10 #size that the predator is best at eating
+
+startSize = 10 #middle of the bell curve of starting size
+
+deviation = 2.5 #deviation of predator bell curve
+
+bestSuccess = 0.1 #the best sucess a predator can have at eating its prey, high values will bacically crash the simulation so I don't reccomend trying those
+
 #globals you shouldn't touch
 organisms = []
 food = start_food
+curCycle = 0
+populationOutput = open("output/populations.txt", "w+")
+selectionOutput = open("output/selection.txt", "w+")
+populationOutput.truncate()
+selectionOutput.truncate()
+populationOutput.write("Generation, Population, Food \n")
+selectionOutput.write("Generation, Average size \n")
 
 #classes
 
@@ -32,22 +49,14 @@ class primCons: #organism one, the one that is being predated and evolves
 
     def __init__(self, size):
         self.size = size
+        self.fitness = 0
 
     def sayName(self):
         pass
 
-class predator: #this is the predator, the one that feeds on the primary consumer
-
-    def __init__(self):
-        pass
-
-    def testFunc(self):
-        pass
-
-#functions
 def prepareSim(): #this function prepares the simulation
     for i in range(start_organisms):
-        curOrganism = primCons(n.random.randint(0, 10))
+        curOrganism = primCons(10 + n.random.normal())
         organisms.append(curOrganism)
 
 def breedSpecific(org1, org2): #this function breeds two specific organisms and returns an array of new organisms
@@ -92,7 +101,7 @@ def breedOrganisms(): #this function breeds the organisms
 
     #divide our current generation into two random parts
     if(len(orgCop) % 2 == 1):
-        orgCop.sort(key=lambda x: x.size, reverse=True)
+        orgCop.sort(key=lambda x: (x.size, x.fitness), reverse=True)
         orgCop.pop()
 
     n.random.shuffle(orgCop)
@@ -126,25 +135,66 @@ def doRepSucc(): #this funciton give us a new, updated reproductive success
         output = slop * (ratio - 2) + reprSuccess
         #print(output)
         return reprSuccess + output*succChange
+def doEncounters():
+    global encounters, organisms
+    for i in range(encounters):
+        toDelete = [] #indexes we will delete
+        for j in range(len(organisms)):
+            curSize = organisms[j].size
+            prob = doBellCurve(curSize)
+            if(r.random() < prob):
+                toDelete.append(j)
+            else:
+                organisms[j].fitness += 1
+
+        organisms = removeIndexes(organisms, toDelete)
+
+def doBellCurve(size):
+    global bestSize, deviation
+    part1 = (1/(deviation*pow((2*m.pi),0.5)))
+    part2 = pow(m.e,(-1*(pow((size - bestSize), 2)/(2*pow(deviation, 2)))))
+    output = part1*part2*deviation
+
+    output /= 0.39894228040143276
+
+    output *= bestSuccess
+
+    return output
 
 def doGeneration(): #calls multiple functions in order so I don't have to do everything in the main loop
-    global organisms, food, reprSuccess
-
+    global organisms, food, reprSuccess, curCycle
+    doEncounters()
     organisms = breedOrganisms()
     food = doFood()
     reprSuccess = doRepSucc()
+    curCycle += 1
+def logData(): #logs the data to the output folder
+    global populationOutput
+    populationOutput.write(str(curCycle) + ", " + str(len(organisms)) + ", " + str(food) + "\n")
+    values = []
+    for i in organisms:
+        values.append(i.size)
+    selectionOutput.write(str(curCycle) + ", " + str(mean(values)) + "\n")
+
+def removeIndexes(inPut, toRemove):
+    copy = inPut
+    toRemove.sort()
+    for i in reversed(toRemove):
+        del copy[i]
+    return copy
+def mean(numbers):
+    return float(sum(numbers)) / max(len(numbers), 1)
 
 def main():
     global organisms
     #prepare the simulation
     prepareSim()
-    print("[")
-
     #do the set amount of generations
     for i in range(maxGenerations):
         doGeneration()
-        print(str(len(organisms)) + " ,")
+        logData()
 
-    print("]")
-if __name__ == "__main__":
+
+if __name__ == "__main__": #so we don't get bamboozled by a module
     main()
+    pass
